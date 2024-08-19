@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Click the Target Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #121212;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+
+        #game-area {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .target {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            background-color: red;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        #top-bar {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            font-size: 24px;
+        }
+
+        #hit-counter {
+            margin-right: 20px;
+        }
+
+        #time-counter {
+            margin-left: 20px;
+        }
+
+        #result {
+            font-size: 24px;
+            text-align: center;
+        }
+
+        #controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        #restart-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+        }
+
+        #restart-btn:hover {
+            background-color: #0056b3;
+        }
+
+        #seed-input {
+            display: block;
+            margin-top: 10px;
+            padding: 5px;
+            font-size: 16px;
+            width: 200px;
+            text-align: center;
+        }
+
+        #pause-message {
+            display: none;
+            font-size: 24px;
+            color: white;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="game-area"></div>
+    <div id="top-bar">
+        <div id="hit-counter">Hits: 0</div>
+        <div id="time-counter">Time: 10</div>
+    </div>
+    <div id="result">You clicked 0 targets!</div>
+    <div id="controls">
+        <button id="restart-btn">Restart</button>
+        <input type="text" id="seed-input" value="2332" placeholder="Enter Seed">
+    </div>
+    <div id="pause-message">Game Paused. Please return to fullscreen to resume.</div>
+
+    <script>
+        let score = 0;
+        let timeLeft = 10;
+        let seed = 2332;
+        const gameArea = document.getElementById('game-area');
+        const result = document.getElementById('result');
+        const restartBtn = document.getElementById('restart-btn');
+        const timeCounter = document.getElementById('time-counter');
+        const hitCounter = document.getElementById('hit-counter');
+        const seedInput = document.getElementById('seed-input');
+        const pauseMessage = document.getElementById('pause-message');
+        let gameInterval;
+        let timeInterval;
+        let gamePaused = false;
+
+        function random(seed) {
+            const x = Math.sin(seed++) * 10000;
+            return x - Math.floor(x);
+        }
+
+        function getRandomPosition(seed) {
+            const x = random(seed) * (window.innerWidth - 30);
+            const y = random(seed + 1) * (window.innerHeight - 30);
+            return { x, y };
+        }
+
+        function createTarget(seed) {
+            const target = document.createElement('div');
+            target.className = 'target';
+            const { x, y } = getRandomPosition(seed);
+            target.style.left = `${x}px`;
+            target.style.top = `${y}px`;
+            target.addEventListener('click', () => {
+                score++;
+                gameArea.removeChild(target);
+                playSound('hit');
+                createTarget(seed + 2);
+                hitCounter.textContent = `Hits: ${score}`;
+            });
+            gameArea.appendChild(target);
+        }
+
+        gameArea.addEventListener('click', (event) => {
+            if (event.target === gameArea) {
+                playSound('miss');
+            }
+        });
+
+        function playSound(type) {
+            const audio = new Audio(type === 'hit' ? 'hit.wav' : 'miss.wav');
+            audio.play();
+        }
+
+        function startGame() {
+            if (!document.fullscreenElement) {
+                requestFullscreen();
+            }
+            score = 0;
+            timeLeft = 10;
+            result.style.display = 'none';
+            restartBtn.style.display = 'none';
+            seedInput.style.display = 'none';
+            pauseMessage.style.display = 'none';
+            timeCounter.style.display = 'block';
+            timeCounter.textContent = `Time: ${timeLeft}`;
+            hitCounter.textContent = `Hits: 0`;
+
+            timeInterval = setInterval(() => {
+                timeLeft--;
+                timeCounter.textContent = `Time: ${timeLeft}`;
+                if (timeLeft <= 0) {
+                    clearInterval(timeInterval);
+                    endGame();
+                }
+            }, 1000);
+
+            createTarget(seed);
+        }
+
+        function endGame() {
+            gameArea.innerHTML = '';
+            timeCounter.style.display = 'none';
+            result.style.display = 'block';
+            result.textContent = `You clicked ${score} targets!`;
+            restartBtn.style.display = 'block';
+            seedInput.style.display = 'block';
+        }
+
+        function requestFullscreen() {
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen();
+            } else if (document.documentElement.mozRequestFullScreen) { // Firefox
+                document.documentElement.mozRequestFullScreen();
+            } else if (document.documentElement.webkitRequestFullscreen) { // Chrome, Safari, and Opera
+                document.documentElement.webkitRequestFullscreen();
+            } else if (document.documentElement.msRequestFullscreen) { // IE/Edge
+                document.documentElement.msRequestFullscreen();
+            }
+        }
+
+        function exitFullscreen() {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.mozCancelFullScreen) { // Firefox
+                document.mozCancelFullScreen();
+            } else if (document.webkitExitFullscreen) { // Chrome, Safari, and Opera
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) { // IE/Edge
+                document.msExitFullscreen();
+            }
+        }
+
+        function checkFullscreen() {
+            if (!document.fullscreenElement) {
+                pauseGame();
+            } else if (gamePaused) {
+                resumeGame();
+            }
+        }
+
+        function pauseGame() {
+            clearInterval(timeInterval);
+            gamePaused = true;
+            pauseMessage.style.display = 'block';
+        }
+
+        function resumeGame() {
+            gamePaused = false;
+            pauseMessage.style.display = 'none';
+            timeInterval = setInterval(() => {
+                timeLeft--;
+                timeCounter.textContent = `Time: ${timeLeft}`;
+                if (timeLeft <= 0) {
+                    clearInterval(timeInterval);
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        restartBtn.addEventListener('click', () => {
+            seed = parseInt(seedInput.value, 10);
+            startGame();
+        });
+
+        document.addEventListener('fullscreenchange', checkFullscreen);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                pauseGame();
+            }
+        });
+
+        // Initial state is the end screen
+        endGame();
+    </script>
+
+</body>
+
+</html>

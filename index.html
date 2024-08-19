@@ -5,274 +5,248 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Click the Target Game</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #121212;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            font-family: Arial, sans-serif;
-            color: white;
-        }
-
-        #game-area {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-        }
-
-        .target {
-            position: absolute;
-            width: 15px;
-            height: 15px;
-            background-color: red;
-            border-radius: 50%;
-            cursor: pointer;
-        }
-
-        #top-bar {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            align-items: center;
-            font-size: 24px;
-        }
-
-        #hit-counter {
-            margin-right: 20px;
-        }
-
-        #time-counter {
-            margin-left: 20px;
-        }
-
-        #result {
-            font-size: 24px;
-            text-align: center;
-        }
-
-        #controls {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-top: 20px;
-        }
-
-        #restart-btn {
-            margin-top: 20px;
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-            background-color: #007bff;
-            color: #fff;
-            border: none;
-            border-radius: 5px;
-        }
-
-        #restart-btn:hover {
-            background-color: #0056b3;
-        }
-
-        #seed-input {
-            display: block;
-            margin-top: 10px;
-            padding: 5px;
-            font-size: 16px;
-            width: 200px;
-            text-align: center;
-        }
-
-        #pause-message {
-            display: none;
-            font-size: 24px;
-            color: white;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: rgba(0, 0, 0, 0.8);
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-        }
-    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
-<body>
+<body class="bg-gray-900 text-white flex items-center justify-center h-screen">
 
-    <div id="game-area"></div>
-    <div id="top-bar">
+    <div id="game-area" class="relative w-full h-full overflow-hidden"></div>
+
+    <div id="top-bar" class="absolute top-5 left-1/2 transform -translate-x-1/2 flex items-center space-x-10 text-xl">
         <div id="hit-counter">Hits: 0</div>
         <div id="time-counter">Time: 10</div>
     </div>
-    <div id="result">You clicked 0 targets!</div>
-    <div id="controls">
-        <button id="restart-btn">Restart</button>
-        <input type="text" id="seed-input" value="2332" placeholder="Enter Seed">
+
+    <div id="result" class="hidden text-center text-2xl"></div>
+
+    <div id="controls" class="flex flex-col items-center mt-10">
+        <button id="restart-btn"
+            class="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-700 text-white rounded">Restart</button>
+        <input type="text" id="seed-input" value="2332" placeholder="Enter Seed"
+            class="mt-4 px-4 py-2 text-black rounded">
+        <input type="number" id="min-distance-input" placeholder="Min Distance (Optional)"
+            class="mt-4 px-4 py-2 text-black rounded">
+        <input type="number" id="max-distance-input" placeholder="Max Distance (Optional)"
+            class="mt-4 px-4 py-2 text-black rounded">
     </div>
-    <div id="pause-message">Game Paused. Please return to fullscreen to resume.</div>
+
+    <div id="pause-message"
+        class="hidden fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 text-white text-2xl rounded p-8">
+        Game Paused. Please return to fullscreen to resume.</div>
+
+    <div id="stats"
+        class="hidden fixed inset-0 flex flex-col items-center bg-gray-800 bg-opacity-75 text-white p-8 rounded">
+        <div class="text-2xl mb-4">Game Stats</div>
+        <div id="stats-content"></div>
+        <canvas id="graph" class="mt-4 w-full"></canvas>
+        <button id="name-submit-btn" class="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-700 text-white rounded">Submit to
+            Leaderboard</button>
+    </div>
+
+    <!-- Name Input Modal -->
+    <div id="name-modal"
+        class="fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 text-white p-8 rounded">
+        <div class="flex flex-col items-center">
+            <label for="name-input" class="mb-2">Enter your full name:</label>
+            <input type="text" id="name-input" class="px-4 py-2 text-black rounded mb-4" autocomplete="off">
+            <button id="name-confirm-btn"
+                class="px-4 py-2 bg-blue-500 hover:bg-blue-700 text-white rounded">Submit</button>
+        </div>
+    </div>
 
     <script>
-        let score = 0;
-        let timeLeft = 10;
-        let seed = 2332;
-        const gameArea = document.getElementById('game-area');
-        const result = document.getElementById('result');
-        const restartBtn = document.getElementById('restart-btn');
-        const timeCounter = document.getElementById('time-counter');
-        const hitCounter = document.getElementById('hit-counter');
-        const seedInput = document.getElementById('seed-input');
-        const pauseMessage = document.getElementById('pause-message');
-        let gameInterval;
-        let timeInterval;
-        let gamePaused = false;
+        const apiKey = "$2a$10$gwxUJBrS5PQ6Phevd/wnJOEDDXPm.ThptKKA.p7l.tox15Kh0dTmq";
+        const binId = "66c3465be41b4d34e4226708";
+        let score = 0, timeLeft = 10, seed = 2332, gameSpeed = 1000;
+        let gamePaused = false, hitData = [], minDistance, maxDistance;
+        const gameArea = document.getElementById('game-area'), hitCounter = document.getElementById('hit-counter');
+        const timeCounter = document.getElementById('time-counter'), result = document.getElementById('result');
+        const restartBtn = document.getElementById('restart-btn'), seedInput = document.getElementById('seed-input');
+        const minDistanceInput = document.getElementById('min-distance-input'), maxDistanceInput = document.getElementById('max-distance-input');
+        const pauseMessage = document.getElementById('pause-message'), stats = document.getElementById('stats');
+        const statsContent = document.getElementById('stats-content'), nameModal = document.getElementById('name-modal');
+        const nameInput = document.getElementById('name-input'), nameConfirmBtn = document.getElementById('name-confirm-btn');
+        const nameSubmitBtn = document.getElementById('name-submit-btn');
+        let timeInterval, currentTarget, startTime, playerName = "";
 
-        function random(seed) {
-            const x = Math.sin(seed++) * 10000;
-            return x - Math.floor(x);
-        }
+        const random = seed => Math.sin(seed++) * 10000 % 1;
 
-        function getRandomPosition(seed) {
-            const x = random(seed) * (window.innerWidth - 30);
-            const y = random(seed + 1) * (window.innerHeight - 30);
+        const getRandomPosition = seed => {
+            let x, y, distance;
+            do {
+                x = random(seed) * (window.innerWidth - 30);
+                y = random(seed + 1) * (window.innerHeight - 30);
+                distance = currentTarget ? Math.hypot(x - currentTarget.x, y - currentTarget.y) : 0;
+            } while ((minDistance && distance < minDistance) || (maxDistance && distance > maxDistance));
             return { x, y };
-        }
+        };
 
-        function createTarget(seed) {
+        const createTarget = () => {
+            if (currentTarget) {
+                gameArea.removeChild(currentTarget.element);
+            }
+            seed += 2; // Increment seed to ensure different positions for each target
             const target = document.createElement('div');
-            target.className = 'target';
             const { x, y } = getRandomPosition(seed);
+            target.className = 'target absolute bg-red-500 rounded-full cursor-pointer';
+            target.style.width = '15px';
+            target.style.height = '15px';
             target.style.left = `${x}px`;
             target.style.top = `${y}px`;
-            target.addEventListener('click', () => {
-                score++;
-                gameArea.removeChild(target);
-                playSound('hit');
-                createTarget(seed + 2);
-                hitCounter.textContent = `Hits: ${score}`;
-            });
+            target.addEventListener('click', () => recordHit(x, y));
             gameArea.appendChild(target);
-        }
+            currentTarget = { x, y, element: target };
+            startTime = performance.now();
+        };
 
-        gameArea.addEventListener('click', (event) => {
-            if (event.target === gameArea) {
-                playSound('miss');
-            }
-        });
+        const recordHit = (x, y, seed) => {
+            const endTime = performance.now(), timeTaken = endTime - startTime;
+            const distance = Math.hypot(currentTarget.x - x, currentTarget.y - y);
+            hitData.push({ time: timeTaken, distance });
+            score++;
+            hitCounter.textContent = `Hits: ${score}`;
+            createTarget(seed + 2);
+        };
 
-        function playSound(type) {
-            const audio = new Audio(type === 'hit' ? 'hit.wav' : 'miss.wav');
-            audio.play();
-        }
+        const playSound = type => new Audio(`${type}.wav`).play();
 
-        function startGame() {
-            if (!document.fullscreenElement) {
-                requestFullscreen();
-            }
+        const startGame = () => {
+            if (!document.fullscreenElement) requestFullscreen();
+            resetGame();
+            timeInterval = setInterval(() => updateTime(), gameSpeed);
+            createTarget(seed);
+        };
+
+        const updateTime = () => {
+            if (--timeLeft <= 0) endGame();
+            timeCounter.textContent = `Time: ${timeLeft}`;
+        };
+
+        const resetGame = () => {
             score = 0;
             timeLeft = 10;
-            result.style.display = 'none';
-            restartBtn.style.display = 'none';
-            seedInput.style.display = 'none';
-            pauseMessage.style.display = 'none';
-            timeCounter.style.display = 'block';
-            timeCounter.textContent = `Time: ${timeLeft}`;
-            hitCounter.textContent = `Hits: 0`;
-
-            timeInterval = setInterval(() => {
-                timeLeft--;
-                timeCounter.textContent = `Time: ${timeLeft}`;
-                if (timeLeft <= 0) {
-                    clearInterval(timeInterval);
-                    endGame();
-                }
-            }, 1000);
-
-            createTarget(seed);
-        }
-
-        function endGame() {
-            gameArea.innerHTML = '';
-            timeCounter.style.display = 'none';
-            result.style.display = 'block';
-            result.textContent = `You clicked ${score} targets!`;
-            restartBtn.style.display = 'block';
-            seedInput.style.display = 'block';
-        }
-
-        function requestFullscreen() {
-            if (document.documentElement.requestFullscreen) {
-                document.documentElement.requestFullscreen();
-            } else if (document.documentElement.mozRequestFullScreen) { // Firefox
-                document.documentElement.mozRequestFullScreen();
-            } else if (document.documentElement.webkitRequestFullscreen) { // Chrome, Safari, and Opera
-                document.documentElement.webkitRequestFullscreen();
-            } else if (document.documentElement.msRequestFullscreen) { // IE/Edge
-                document.documentElement.msRequestFullscreen();
-            }
-        }
-
-        function exitFullscreen() {
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            } else if (document.mozCancelFullScreen) { // Firefox
-                document.mozCancelFullScreen();
-            } else if (document.webkitExitFullscreen) { // Chrome, Safari, and Opera
-                document.webkitExitFullscreen();
-            } else if (document.msExitFullscreen) { // IE/Edge
-                document.msExitFullscreen();
-            }
-        }
-
-        function checkFullscreen() {
-            if (!document.fullscreenElement) {
-                pauseGame();
-            } else if (gamePaused) {
-                resumeGame();
-            }
-        }
-
-        function pauseGame() {
+            gameSpeed = 1000;
+            hitData = [];
+            minDistance = +minDistanceInput.value || 0;
+            maxDistance = +maxDistanceInput.value || Infinity;
             clearInterval(timeInterval);
-            gamePaused = true;
-            pauseMessage.style.display = 'block';
-        }
+            result.classList.add('hidden');
+            stats.classList.add('hidden');
+        };
 
-        function resumeGame() {
-            gamePaused = false;
-            pauseMessage.style.display = 'none';
-            timeInterval = setInterval(() => {
-                timeLeft--;
-                timeCounter.textContent = `Time: ${timeLeft}`;
-                if (timeLeft <= 0) {
+        const endGame = () => {
+            clearInterval(timeInterval);
+            gameArea.innerHTML = '';
+            timeCounter.classList.add('hidden');
+            result.classList.remove('hidden');
+            result.textContent = `You clicked ${score} targets!`;
+            restartBtn.classList.remove('hidden');
+            seedInput.classList.remove('hidden');
+            minDistanceInput.classList.remove('hidden');
+            maxDistanceInput.classList.remove('hidden');
+            showStats();
+            nameModal.classList.remove('hidden');
+        };
+
+        const showStats = () => {
+                const totalTargets = hitData.length, totalTime = hitData.reduce((acc, { time }) => acc + time, 0);
+                const avgRate = (totalTime / totalTargets).toFixed(2), fastestHit = Math.min(...hitData.map(({ time }) => time)).toFixed(2);
+                const slowestHit = Math.max(...hitData.map(({ time }) => time)).toFixed(2), avgDistance = (hitData.reduce((acc, { distance }) => acc + distance, 0) / totalTargets).toFixed(2);
+                const targetsPerMinute = (60000 / avgRate).toFixed(2), fastestTPM = (60000 / fastestHit).toFixed(2), slowestTPM = (60000 / slowestHit).toFixed(2);
+
+                statsContent.innerHTML = `
+        <p>Targets Hit: ${totalTargets} targets in ${timeLeft} seconds</p>
+        <p>Game Area: ${window.innerWidth}px x ${window.innerHeight}px</p>
+        <p>Avg. Rate: ${avgRate}ms per target for ${avgDistance}px distance | ${targetsPerMinute} TPM</p>
+        <p>Fastest Hit: ${fastestHit}ms | ${fastestTPM} TPM</p>
+        <p>Slowest Hit: ${slowestHit}ms | ${slowestTPM} TPM</p>
+        <table>
+            <tr><th>#</th><th>Speed</th><th>Distance</th></tr>
+            ${hitData.map((data, i) => `<tr><td>${i + 1}</td><td>${data.time.toFixed(2)}ms</td><td>${data.distance.toFixed(2)}px</td></tr>`).join('')}
+        </table>
+    `;
+                generateGraph();
+            };
+            const generateGraph = () => {
+                    const ctx = document.getElementById('graph').getContext('2d');
+                    const labels = hitData.map((_, i) => i + 1);
+                    const data = {
+                        labels,
+                        datasets: [{
+                            label: 'Hit Time (ms)',
+                            data: hitData.map(data => data.time),
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            fill: false,
+                        }]
+                    };
+                    new Chart(ctx, { type: 'line', data });
+                };
+
+                const requestFullscreen = () => document.documentElement.requestFullscreen();
+
+                const submitToLeaderboard = async () => {
+                    const leaderboardEntry = {
+                        name: playerName,
+                        score,
+                        seed,
+                        resolution: `${window.innerWidth}x${window.innerHeight}`,
+                        minDistance: minDistance || "Not Set",
+                        maxDistance: maxDistance !== Infinity ? maxDistance : "Not Set"
+                    };
+                    try {
+                        const response = await fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Master-Key': apiKey
+                            },
+                            body: JSON.stringify(leaderboardEntry)
+                        });
+                        if (!response.ok) throw new Error('Failed to save');
+                    } catch (error) {
+                        console.error("Error saving to leaderboard:", error);
+                    }
+                };
+
+                nameConfirmBtn.addEventListener('click', () => {
+                    playerName = nameInput.value;
+                    if (playerName.trim()) {
+                        nameModal.classList.add('hidden');
+                    }
+                });
+
+                nameSubmitBtn.addEventListener('click', () => {
+                    if (playerName.trim()) {
+                        submitToLeaderboard();
+                        stats.classList.add('hidden');
+                    }
+                });
+
+                restartBtn.addEventListener('click', () => {
+                    seed = parseInt(seedInput.value, 10);
+                    startGame();
+                });
+
+                document.addEventListener('fullscreenchange', () => {
+                    if (!document.fullscreenElement) pauseGame();
+                    else resumeGame();
+                });
+
+                const pauseGame = () => {
                     clearInterval(timeInterval);
-                    endGame();
-                }
-            }, 1000);
-        }
+                    gamePaused = true;
+                    pauseMessage.classList.remove('hidden');
+                };
 
-        restartBtn.addEventListener('click', () => {
-            seed = parseInt(seedInput.value, 10);
-            startGame();
-        });
+                const resumeGame = () => {
+                    gamePaused = false;
+                    pauseMessage.classList.add('hidden');
+                    timeInterval = setInterval(updateTime, gameSpeed);
+                };
 
-        document.addEventListener('fullscreenchange', checkFullscreen);
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'hidden') {
-                pauseGame();
-            }
-        });
-
-        // Initial state is the end screen
-        endGame();
-    </script>
-
-</body>
-
-</html>
+                endGame();  // Initial state is the end screen
+            </script>
+            </body>
+            </html>
