@@ -1,6 +1,7 @@
 let score = 0;
 const gameArea = document.getElementById('game-area');
 const result = document.getElementById('result');
+const controls = document.getElementById('controls');
 const restartBtn = document.getElementById('restart-btn');
 const timeCounter = document.getElementById('time-counter');
 const hitCounter = document.getElementById('hit-counter');
@@ -11,29 +12,56 @@ var previousTarget;
 var latestHitTargetRect;
 let gameInterval;
 let timeInterval;
+let chartInstance = null;
 var seed = 2332;
 let gamePaused = false;
 let gameLength = 10; // 3 seconds
+const minDistanceInput = document.getElementById('min-distance');
+const maxDistanceInput = document.getElementById('max-distance');
+let minDistance = 0;
+let maxDistance = 1000;
+const MAX_ATTEMPTS = 100; // Prevent infinite loops
+
 
 let state = {
     hitData: [],
     startTime: 0,
     timeLeft: 3,
-    lastTargetTime: 0
+    lastTargetTime: 0,
+    missedClicks: 0
 };
-
 function random(seed) {
     const x = Math.sin(seed++) * 10000;
     return x - Math.floor(x);
 }
 
+// function getRandomPosition() {
+//     const x = random(seed) * (window.innerWidth - 30);
+//     const y = random(seed + 1) * (window.innerHeight - 30);
+//     seed = seed + 2;
+//     return { x, y };
+// }
+
 function getRandomPosition() {
-    const x = random(seed) * (window.innerWidth - 30);
-    const y = random(seed + 1) * (window.innerHeight - 30);
-    seed = seed + 2;
+    // gets a random position within a certain distance
+    let x, y, distance;
+    let attempts = 0;
+    do {
+        x = random(seed) * window.innerWidth;
+        y = random(seed + 1) * window.innerHeight;
+        seed = seed + 2;
+        if(!latestHitTargetRect) {
+            return { x, y };
+        }
+        distance = getDistanceRectToPoint(latestHitTargetRect, x, y);
+        attempts++;
+        if (attempts > MAX_ATTEMPTS) {
+            console.warn("Couldn't find a position within the specified range. Using the last generated position.");
+            break;
+        }
+    } while (distance < minDistance || distance > maxDistance);
     return { x, y };
 }
-
 function getRectDistance(rectA, rectB) {
     // Calculate the center of rectangle A
     const centerA_X = rectA.left + rectA.width / 2;
@@ -96,6 +124,7 @@ function createTarget() {
         });
         state.lastTargetTime = now; // Update lastTargetTime for the next target
         hitCounter.textContent = `Hits: ${score}`;
+        // hitCounter.textContent = `Hits: ${score} gameArea: ${gameArea.getBoundingClientRect().width}x${gameArea.getBoundingClientRect().height}`;
     });
 
     gameArea.appendChild(target);
@@ -109,10 +138,14 @@ function playSound(type) {
 }
 
 function startGame() {
-    // if (!document.fullscreenElement) {
-    //     requestFullscreen();
-    // }
+    if (!document.fullscreenElement) {
+        requestFullscreen();
+    }
+    seed = parseInt(seedInput.value, 10);
+    minDistance = parseInt(minDistanceInput.value, 10);
+    maxDistance = parseInt(maxDistanceInput.value, 10);
     score = 0;
+    state.missedClicks = 0;
     state.timeLeft = gameLength;
     state.hitData = [];
     state.startTime = performance.now();
@@ -120,9 +153,11 @@ function startGame() {
     state.endTime = state.startTime + (gameLength * 1000); // Use gameLength variable
 
     result.style.display = 'none';
-    restartBtn.style.display = 'none';
-    seedInput.style.display = 'none';
+    
+    controls.style.display = 'none';
+
     pauseMessage.style.display = 'none';
+
     timeCounter.style.display = 'block';
     timeCounter.textContent = `Time: ${state.timeLeft}`;
     hitCounter.textContent = `Hits: 0`;
@@ -144,20 +179,26 @@ const statsContent = document.getElementById('stats-content');
 const closeBtn = document.querySelector('.close');
 
 function showStats() {
-    const totalTime = gameLength; // Game duration in seconds
+    const totalTime = gameLength;
     const totalTargets = state.hitData.length;
+    const totalClicks = totalTargets + state.missedClicks;
+    const accuracy = (totalTargets / totalClicks * 100).toFixed(2);
     const targetsPerMinute = (totalTargets / totalTime) * 60;
-    const validHitTimes = state.hitData.map(hit => Math.max(0, hit.time)); // Ensure non-negative times
+    const validHitTimes = state.hitData.map(hit => Math.max(0, hit.time));
     const totalHitTime = validHitTimes.reduce((sum, time) => sum + time, 0);
     const avgHitTime = totalHitTime / totalTargets;
     const fastestHit = Math.min(...validHitTimes);
     const slowestHit = Math.max(...validHitTimes);
 
-    // Keep original order for the table
     statsContent.innerHTML = `
-        <p>Targets Hit: ${totalTargets} targets in ${gameLength} seconds</p>
+        <h2>Score</h2>
+        <p>${totalTargets} targets</p>
+        <h2>${targetsPerMinute.toFixed(2)} TPM (Targets Per Minute)</h2>
+        <p>------------------------</p>
+        <p>Accuracy: ${accuracy}% (${totalTargets} hits, ${state.missedClicks} misses)</p>
+        <p>Total Game Length: ${gameLength} seconds</p>
         <p>Game Area: ${window.innerWidth}px x ${window.innerHeight}px</p>
-        <p>Avg. Hit Time: ${avgHitTime.toFixed(2)}ms | ${targetsPerMinute.toFixed(2)} Targets Per Minute</p>
+        <p>Avg. Hit Time: ${avgHitTime.toFixed(2)}ms</p>
         <p>Fastest Hit: ${fastestHit.toFixed(2)}ms (Distance: ${state.hitData.find(hit => hit.time === fastestHit).distance.toFixed(2)}px)</p>
         <p>Slowest Hit: ${slowestHit.toFixed(2)}ms (Distance: ${state.hitData.find(hit => hit.time === slowestHit).distance.toFixed(2)}px)</p>
         <table>
@@ -197,7 +238,10 @@ function showStats() {
     ];
 
     const ctx = document.getElementById('stats-chart').getContext('2d');
-    new Chart(ctx, {
+    if (chartInstance) {
+        chartInstance.destroy();
+    }
+    chartInstance = new Chart(ctx, {
         type: 'scatter',
         data: {
             datasets: [{
@@ -205,17 +249,11 @@ function showStats() {
                 data: chartData,
                 backgroundColor: 'rgba(75,192,192,0.6)',
                 borderColor: 'rgba(75,192,192,1)',
-                pointRadius: 6,
-                pointHoverRadius: 8
-            },
-            {
-                label: 'Linear Fit',
-                data: lineFitData,
-                type: 'line',
+                pointRadius: 8,
+                pointHoverRadius: 10,
+                showLine: true,
                 fill: false,
-                borderColor: 'rgba(255,0,0,0.7)',
-                borderWidth: 2,
-                pointRadius: 0
+                tension: 0.1
             }]
         },
         options: {
@@ -241,18 +279,7 @@ function showStats() {
                 tooltip: {
                     callbacks: {
                         label: function (context) {
-                            if (context.dataset.label === 'Hit Time vs Distance') {
-                                return `Distance: ${context.parsed.x.toFixed(2)}px, Time: ${context.parsed.y.toFixed(2)}ms`;
-                            }
-                            return '';
-                        }
-                    }
-                },
-                legend: {
-                    labels: {
-                        filter: function (item) {
-                            // Hide the legend for the linear fit
-                            return item.text !== 'Linear Fit';
+                            return `Distance: ${context.parsed.x.toFixed(2)}px, Time: ${context.parsed.y.toFixed(2)}ms`;
                         }
                     }
                 }
@@ -262,22 +289,29 @@ function showStats() {
 
     statsModal.style.display = 'flex';
 }
-closeBtn.onclick = function() {
+closeBtn.onclick = function () {
     statsModal.style.display = 'none';
+    // Clear the chart canvas to prevent ghosting
+    const ctx = document.getElementById('stats-chart').getContext('2d');
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    if (chartInstance) {
+        chartInstance.destroy();
+        chartInstance = null;
+    }
 };
 
 function endGame(shouldShowStats = true) {
     gameArea.innerHTML = '';
     timeCounter.style.display = 'none';
-    restartBtn.style.display = 'block';
-    seedInput.style.display = 'block';
-    if(shouldShowStats) {
-        showStats();
+    controls.style.display = 'block';
+    result.style.display = 'block';
+    result.textContent = `You clicked ${score} targets!`;
+    if (shouldShowStats) {
+        setTimeout(showStats(), 100);
     }
 }
 
 function requestFullscreen() {
-    return
     if (document.documentElement.requestFullscreen) {
         document.documentElement.requestFullscreen();
     } else if (document.documentElement.mozRequestFullScreen) { // Firefox
@@ -318,7 +352,6 @@ function resumeGame() {
 
 restartBtn.addEventListener('click', () => {
     latestHitTargetRect = restartBtn.getBoundingClientRect();
-    seed = parseInt(seedInput.value, 10);
     startGame();
 });
 
@@ -335,6 +368,7 @@ gameArea.addEventListener('click', (event) => {
     // if event is not target then play miss sound
     if (event.target.className !== 'target') {
         playSound('miss');
+        state.missedClicks++;
     }
     // TODO: add a miss to the data
 });
