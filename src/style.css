@@ -9,6 +9,14 @@ body {
     font-family: Arial, sans-serif;
     color: white;
 }
+#stats-chart {
+    width: 100%;
+    height: 300px;
+    max-height: 50vh;
+    /* Limit the chart height to 50% of the viewport height */
+    margin: 20px 0;
+    /* Add some vertical margin */
+}
 /* Stats Modal Styles */
 .modal {
     display: none;
@@ -35,6 +43,8 @@ body {
     color: #333;
     border-radius: 10px;
     text-align: center;
+    max-height: 80vh;
+    overflow-y: auto;
 }
 
 .close {

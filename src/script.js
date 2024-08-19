@@ -13,11 +13,13 @@ let gameInterval;
 let timeInterval;
 var seed = 2332;
 let gamePaused = false;
+let gameLength = 3; // 3 seconds
 
 let state = {
     hitData: [],
     startTime: 0,
-    timeLeft: 10,
+    timeLeft: 3,
+    lastTargetTime: 0
 };
 
 function random(seed) {
@@ -67,11 +69,14 @@ function createTarget() {
     const now = performance.now();
 
     state.startTime = now;
+    state.lastTargetTime = performance.now();
     target.style.left = `${x}px`;
     target.style.top = `${y}px`;
 
     target.addEventListener('click', () => {
+        const now = performance.now();
         latestHitTargetRect = target.getBoundingClientRect();
+        const hitTime = now - state.lastTargetTime; // Correct order of subtraction
         // get all target children of gameArea
         const targets = gameArea.querySelectorAll('.target');
         // if there are no targets left, create a new one
@@ -83,7 +88,13 @@ function createTarget() {
         playSound('hit');
         let targetRec = target.getBoundingClientRect();
         let distance = getRectDistance(latestHitTargetRect, targetRec);
-        state.hitData.push({ x: targetRec.left, y: targetRec.top, time: performance.now() - state.startTime, distance });
+        state.hitData.push({
+            x: targetRec.left,
+            y: targetRec.top,
+            time: hitTime,
+            distance
+        });
+        state.lastTargetTime = now; // Update lastTargetTime for the next target
         hitCounter.textContent = `Hits: ${score}`;
     });
 
@@ -102,8 +113,12 @@ function startGame() {
     //     requestFullscreen();
     // }
     score = 0;
-    state.timeLeft = 3;
+    state.timeLeft = gameLength;
     state.hitData = [];
+    state.startTime = performance.now();
+    state.lastTargetTime = state.startTime; // Initialize lastTargetTime
+    state.endTime = state.startTime + (gameLength * 1000); // Use gameLength variable
+
     result.style.display = 'none';
     restartBtn.style.display = 'none';
     seedInput.style.display = 'none';
@@ -113,13 +128,14 @@ function startGame() {
     hitCounter.textContent = `Hits: 0`;
 
     timeInterval = setInterval(() => {
-        state.timeLeft--;
-        timeCounter.textContent = `Time: ${state.timeLeft}`;
-        if (state.timeLeft <= 0) {
+        const currentTime = performance.now();
+        state.timeLeft = Math.max(0, (state.endTime - currentTime) / 1000);
+        timeCounter.textContent = `Time: ${state.timeLeft.toFixed(2)}`;
+        if (currentTime >= state.endTime) {
             clearInterval(timeInterval);
             endGame();
         }
-    }, 1000);
+    }, 16); // Update roughly 60 times per second
 
     createTarget();
 }
@@ -128,26 +144,30 @@ const statsContent = document.getElementById('stats-content');
 const closeBtn = document.querySelector('.close');
 
 function showStats() {
+    const totalTime = 3; // Game duration in seconds
     const totalTargets = state.hitData.length;
-    const totalTime = 3 - state.timeLeft; // Total time in seconds
-    const totalHitTime = state.hitData.reduce((acc, { time }) => acc + time, 0);
-    const avgRate = (totalHitTime / totalTargets).toFixed(2);
-    const fastestHit = Math.min(...state.hitData.map(({ time }) => time)).toFixed(2);
-    const slowestHit = Math.max(...state.hitData.map(({ time }) => time)).toFixed(2);
-    const avgDistance = (state.hitData.reduce((acc, { distance }) => acc + distance, 0) / totalTargets).toFixed(2);
-    const targetsPerMinute = (60000 / avgRate).toFixed(2);
-    const fastestTPM = (60000 / fastestHit).toFixed(2);
-    const slowestTPM = (60000 / slowestHit).toFixed(2);
+    const targetsPerMinute = (totalTargets / totalTime) * 60;
+    const validHitTimes = state.hitData.map(hit => Math.max(0, hit.time)); // Ensure non-negative times
+    const totalHitTime = validHitTimes.reduce((sum, time) => sum + time, 0);
+    const avgHitTime = totalHitTime / totalTargets;
+    const fastestHit = Math.min(...validHitTimes);
+    const slowestHit = Math.max(...validHitTimes);
 
     statsContent.innerHTML = `
-        <p>Targets Hit: ${totalTargets} targets in ${totalTime} seconds</p>
+        <p>Targets Hit: ${totalTargets} targets in ${gameLength} seconds</p>
         <p>Game Area: ${window.innerWidth}px x ${window.innerHeight}px</p>
-        <p>Avg. Rate: ${avgRate}ms per target for ${avgDistance}px distance | ${targetsPerMinute} TPM</p>
-        <p>Fastest Hit: ${fastestHit}ms | ${fastestTPM} TPM</p>
-        <p>Slowest Hit: ${slowestHit}ms | ${slowestTPM} TPM</p>
+        <p>Avg. Hit Time: ${avgHitTime.toFixed(2)}ms | ${targetsPerMinute.toFixed(2)} Targets Per Minute</p>
+        <p>Fastest Hit: ${fastestHit.toFixed(2)}ms</p>
+        <p>Slowest Hit: ${slowestHit.toFixed(2)}ms</p>
         <table>
-            <tr><th>#</th><th>Speed</th><th>Distance</th></tr>
-            ${state.hitData.map((data, i) => `<tr><td>${i + 1}</td><td>${data.time.toFixed(2)}ms</td><td>${data.distance.toFixed(2)}px</td></tr>`).join('')}
+            <tr><th>#</th><th>Time</th><th>Distance</th></tr>
+            ${state.hitData.map((data, i) => `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td>${Math.max(0, data.time).toFixed(2)}ms</td>
+                    <td>${data.distance.toFixed(2)}px</td>
+                </tr>
+            `).join('')}
         </table>
     `;
 
