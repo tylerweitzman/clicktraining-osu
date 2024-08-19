@@ -13,7 +13,7 @@ let gameInterval;
 let timeInterval;
 var seed = 2332;
 let gamePaused = false;
-let gameLength = 3; // 3 seconds
+let gameLength = 10; // 3 seconds
 
 let state = {
     hitData: [],
@@ -144,7 +144,7 @@ const statsContent = document.getElementById('stats-content');
 const closeBtn = document.querySelector('.close');
 
 function showStats() {
-    const totalTime = 3; // Game duration in seconds
+    const totalTime = gameLength; // Game duration in seconds
     const totalTargets = state.hitData.length;
     const targetsPerMinute = (totalTargets / totalTime) * 60;
     const validHitTimes = state.hitData.map(hit => Math.max(0, hit.time)); // Ensure non-negative times
@@ -153,35 +153,69 @@ function showStats() {
     const fastestHit = Math.min(...validHitTimes);
     const slowestHit = Math.max(...validHitTimes);
 
+    // Keep original order for the table
     statsContent.innerHTML = `
         <p>Targets Hit: ${totalTargets} targets in ${gameLength} seconds</p>
         <p>Game Area: ${window.innerWidth}px x ${window.innerHeight}px</p>
         <p>Avg. Hit Time: ${avgHitTime.toFixed(2)}ms | ${targetsPerMinute.toFixed(2)} Targets Per Minute</p>
-        <p>Fastest Hit: ${fastestHit.toFixed(2)}ms</p>
-        <p>Slowest Hit: ${slowestHit.toFixed(2)}ms</p>
+        <p>Fastest Hit: ${fastestHit.toFixed(2)}ms (Distance: ${state.hitData.find(hit => hit.time === fastestHit).distance.toFixed(2)}px)</p>
+        <p>Slowest Hit: ${slowestHit.toFixed(2)}ms (Distance: ${state.hitData.find(hit => hit.time === slowestHit).distance.toFixed(2)}px)</p>
         <table>
-            <tr><th>#</th><th>Time</th><th>Distance</th></tr>
+            <tr><th>#</th><th>Distance (px)</th><th>Time (ms)</th></tr>
             ${state.hitData.map((data, i) => `
                 <tr>
                     <td>${i + 1}</td>
-                    <td>${Math.max(0, data.time).toFixed(2)}ms</td>
-                    <td>${data.distance.toFixed(2)}px</td>
+                    <td>${data.distance.toFixed(2)}</td>
+                    <td>${data.time.toFixed(2)}</td>
                 </tr>
             `).join('')}
         </table>
     `;
 
+    // Sort data for the chart
+    const sortedHitData = [...state.hitData].sort((a, b) => a.distance - b.distance);
+
+    // Prepare data for the chart
+    const chartData = sortedHitData.map(hit => ({
+        x: hit.distance,
+        y: hit.time
+    }));
+
+    // Calculate linear regression
+    const n = chartData.length;
+    const sumX = chartData.reduce((sum, point) => sum + point.x, 0);
+    const sumY = chartData.reduce((sum, point) => sum + point.y, 0);
+    const sumXY = chartData.reduce((sum, point) => sum + point.x * point.y, 0);
+    const sumX2 = chartData.reduce((sum, point) => sum + point.x * point.x, 0);
+
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+
+    const lineFitData = [
+        { x: chartData[0].x, y: slope * chartData[0].x + intercept },
+        { x: chartData[chartData.length - 1].x, y: slope * chartData[chartData.length - 1].x + intercept }
+    ];
+
     const ctx = document.getElementById('stats-chart').getContext('2d');
     new Chart(ctx, {
-        type: 'line',
+        type: 'scatter',
         data: {
-            labels: state.hitData.map((_, i) => i + 1),
             datasets: [{
-                label: 'Hit Time (ms)',
-                data: state.hitData.map(({ time }) => time),
+                label: 'Hit Time vs Distance',
+                data: chartData,
+                backgroundColor: 'rgba(75,192,192,0.6)',
                 borderColor: 'rgba(75,192,192,1)',
-                backgroundColor: 'rgba(75,192,192,0.2)',
-                fill: false
+                pointRadius: 6,
+                pointHoverRadius: 8
+            },
+            {
+                label: 'Linear Fit',
+                data: lineFitData,
+                type: 'line',
+                fill: false,
+                borderColor: 'rgba(255,0,0,0.7)',
+                borderWidth: 2,
+                pointRadius: 0
             }]
         },
         options: {
@@ -189,34 +223,48 @@ function showStats() {
             maintainAspectRatio: false,
             scales: {
                 x: {
+                    type: 'linear',
+                    position: 'bottom',
                     title: {
                         display: true,
-                        text: 'Hit Number'
+                        text: 'Distance to Target (px)'
                     }
                 },
                 y: {
                     title: {
                         display: true,
-                        text: 'Time (ms)'
+                        text: 'Hit Time (ms)'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            if (context.dataset.label === 'Hit Time vs Distance') {
+                                return `Distance: ${context.parsed.x.toFixed(2)}px, Time: ${context.parsed.y.toFixed(2)}ms`;
+                            }
+                            return '';
+                        }
+                    }
+                },
+                legend: {
+                    labels: {
+                        filter: function (item) {
+                            // Hide the legend for the linear fit
+                            return item.text !== 'Linear Fit';
+                        }
                     }
                 }
             }
         }
     });
 
-
     statsModal.style.display = 'flex';
 }
-
 closeBtn.onclick = function() {
     statsModal.style.display = 'none';
 };
-
-window.onclick = function(event) {
-    if (event.target === statsModal) {
-        statsModal.style.display = 'none';
-    }
-}
 
 function endGame(shouldShowStats = true) {
     gameArea.innerHTML = '';
