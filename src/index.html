@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Click the Target Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="game-area"></div>
+    <div id="top-bar">
+        <div id="hit-counter">Hits: 0</div>
+        <div id="time-counter">Time: 10</div>
+    </div>
+    <div id="result">You clicked 0 targets!</div>
+    <div id="controls">
+        <button id="restart-btn">Restart</button>
+        <input type="text" id="seed-input" value="2332" placeholder="Enter Seed">
+    </div>
+    <div id="pause-message">Game Paused. Please return to fullscreen to resume.</div>
+
+    <!-- New Stats Modal -->
+    <div id="stats-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Game Statistics</h2>
+            <div id="stats-content"></div>
+            <canvas id="stats-chart"></canvas>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>
