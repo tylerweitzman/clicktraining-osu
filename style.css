@@ -34,23 +34,14 @@ body {
     align-items: center;
 }
 
-.modal-content {
-    background-color: #fefefe;
-    margin: auto;
-    padding: 20px;
-    border: 1px solid #888;
-    width: 80%;
-    max-width: 600px;
-    color: #333;
-    border-radius: 10px;
-    text-align: center;
-    max-height: 80vh;
-    overflow-y: auto;
-}
-
 .close {
+    position: absolute;
+    /* Ensure the button is positioned relative to the modal */
+    top: 10px;
+    /* Adjust this value as needed */
+    right: 10px;
+    /* Adjust this value as needed */
     color: #aaa;
-    float: right;
     font-size: 28px;
     font-weight: bold;
     cursor: pointer;
@@ -74,13 +65,40 @@ body {
 
 .target {
     position: absolute;
-    width: 15px;
-    height: 15px;
+    width: 0px;
+    height: 0px;
     background-color: red;
     border-radius: 50%;
     cursor: pointer;
 }
+/* Pre-game Modal Styles */
+#pre-game-modal{
+    text-align: left;
+    width: 70%;
+}
+.modal-content {
+    text-align: left;
+    width: 70%;
+}
 
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+
+#circle-radius {
+    width: 100%;
+}
+
+#radius-value {
+    font-weight: bold;
+    margin-left: 10px;
+}
 #top-bar {
     position: fixed;
     top: 20px;
@@ -136,6 +154,7 @@ body {
 } */
 
 #pause-message {
+    z-index: 1001;
     display: none;
     font-size: 24px;
     color: white;
@@ -147,4 +166,73 @@ body {
     padding: 20px;
     border-radius: 10px;
     text-align: center;
+}
+
+.modal-content {
+    position: relative;
+    /* Allows the close button to be positioned absolutely within */
+    background-color: #fefefe;
+    margin: auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 70%;
+    max-width: 70%;
+    color: #333;
+    border-radius: 10px;
+    text-align: center;
+    max-height: 80vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.modal-content table {
+    font-size: 24px;
+    /* Match the font size with the rest */
+    margin: 0 auto;
+    /* Center the table */
+    border-collapse: collapse;
+    /* Remove space between table cells */
+}
+
+.modal-content th,
+.modal-content td {
+    padding: 10px 20px;
+    /* Add padding for better spacing */
+    text-align: center;
+    /* Center text within cells */
+    border-bottom: 1px solid #ddd;
+    /* Add a border for better readability */
+}
+
+.modal-content th {
+    background-color: #007bff;
+    /* Add a background color to header cells */
+    color: white;
+}
+
+.dock-bottom {
+    position: sticky;
+    bottom: 0;
+    background-color: #fefefe;
+    padding: 10px;
+    width: 100%;
+    display: flex;
+    justify-content: space-around;
+    border-top: 1px solid #ddd;
+}
+
+.dock-bottom button {
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+}
+
+.dock-bottom button:hover {
+    background-color: #0056b3;
 }

@@ -15,13 +15,36 @@
         <div id="time-counter">Time: 10</div>
     </div>
     <div id="result">You clicked 0 targets!</div>
-    <div id="controls">
-        <button id="restart-btn">Restart</button><br><br>
-        Seed: <input type="text" id="seed-input" value="2332" placeholder="Enter Seed"><br>
-        <!-- Min Distance: <input type="number" id="min-distance" value="0" min="0"><br>
-        Max Distance: <input type="number" id="max-distance" value="1000" min="0"> -->
+    <div id="pre-game-modal" class="modal">
+        <div class="modal-content">
+            <h2>Game Settings</h2>
+            <div class="form-group">
+                <label for="map-select">Map (Seed):</label>
+                <input type="number" id="map-select" value="1" min="1" step="1">
+            </div>
+            <div style="display: none">
+            <div class="form-group">
+                <label for="cursor-select">Cursor Type:</label>
+                <select id="cursor-select">
+                    <option value="default">Default OS Cursor</option>
+                    <option value="circular-white">Circular White</option>
+                    <option value="circular-red">Circular Red</option>
+                    <!-- Add more cursor options as needed -->
+                </select>
+            </div></div>
+            <div class="form-group">
+                <label for="circle-radius">Circle Radius:</label>
+                <input type="range" id="circle-radius" min="10" max="100" value="30">
+                <span id="radius-value">20</span> units
+            </div>
+            <div class="form-group">
+                <input type="checkbox" id="fullscreen-checkbox" checked="checked">Full Screen
+            </div>
+            <button id="start-game-btn">Start Game</button>
+        </div>
     </div>
-    <div id="pause-message">Game Paused. Please return to fullscreen to resume.</div>
+    <div id="pause-message">Game Paused. Please return to fullscreen to resume. <button id="resume-btn">Resume</button></div>
+    
 
     <!-- New Stats Modal -->
     <div id="stats-modal" class="modal">
@@ -30,6 +53,11 @@
             <h2>Game Statistics</h2>
             <div id="stats-content"></div>
             <canvas id="stats-chart"></canvas>
+            <!-- <div id="stats-buttons" class="dock-bottom">
+                <button id="retry-btn">Retry Spam</button>
+                <button id="next-map-btn">Next Map</button>
+                <button id="configure-btn">Configure</button>
+            </div> -->
         </div>
     </div>
 
