@@ -9,6 +9,7 @@ const seedInput = document.getElementById('seed-input');
 const pauseMessage = document.getElementById('pause-message');
 var currentTarget;
 var previousTarget;
+var upcomingDistance;
 var latestHitTargetRect;
 let gameInterval;
 let timeInterval;
@@ -21,7 +22,8 @@ const maxDistanceInput = document.getElementById('max-distance');
 let minDistance = 0;
 let maxDistance = 1000;
 const MAX_ATTEMPTS = 100; // Prevent infinite loops
-
+// const SHOULD_SHOW_NEXT_TARGET = true;
+const NEXT_TARGET_OPACITY = 0.3;
 
 let state = {
     hitData: [],
@@ -90,47 +92,174 @@ function getDistanceRectToPoint(rect, x, y) {
     return Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 }
 
-function createTarget() {
+// function createTarget() {
+//     const target = document.createElement('div');
+//     target.className = 'target';
+//     const { x, y } = getRandomPosition(seed);
+//     const now = performance.now();
+
+//     state.startTime = now;
+//     state.lastTargetTime = performance.now();
+//     target.style.left = `${x}px`;
+//     target.style.top = `${y}px`;
+
+//     target.addEventListener('click', () => {
+//         const now = performance.now();
+//         latestHitTargetRect = target.getBoundingClientRect();
+//         const hitTime = now - state.lastTargetTime; // Correct order of subtraction
+//         // get all target children of gameArea
+//         const targets = gameArea.querySelectorAll('.target');
+//         // if there are no targets left, create a new one
+//         if (targets.length === 1) {
+//             createTarget();
+//         }
+//         gameArea.removeChild(target);
+//         score++;
+//         playSound('hit');
+//         let targetRec = target.getBoundingClientRect();
+//         let distance = getRectDistance(latestHitTargetRect, targetRec);
+//         state.hitData.push({
+//             x: targetRec.left,
+//             y: targetRec.top,
+//             time: hitTime,
+//             distance
+//         });
+//         state.lastTargetTime = now; // Update lastTargetTime for the next target
+//         hitCounter.textContent = `Hits: ${score}`;
+//         // hitCounter.textContent = `Hits: ${score} gameArea: ${gameArea.getBoundingClientRect().width}x${gameArea.getBoundingClientRect().height}`;
+//     });
+
+//     gameArea.appendChild(target);
+//     previousTarget = currentTarget;
+//     currentTarget = target;
+// }
+
+function createTarget(isInitial = false) {
     const target = document.createElement('div');
     target.className = 'target';
-    const { x, y } = getRandomPosition(seed);
-    const now = performance.now();
 
-    state.startTime = now;
-    state.lastTargetTime = performance.now();
+    const { x, y } = getRandomPosition(seed);
+
     target.style.left = `${x}px`;
     target.style.top = `${y}px`;
 
-    target.addEventListener('click', () => {
-        const now = performance.now();
-        latestHitTargetRect = target.getBoundingClientRect();
-        const hitTime = now - state.lastTargetTime; // Correct order of subtraction
-        // get all target children of gameArea
-        const targets = gameArea.querySelectorAll('.target');
-        // if there are no targets left, create a new one
-        if (targets.length === 1) {
-            createTarget();
-        }
-        gameArea.removeChild(target);
-        score++;
-        playSound('hit');
-        let targetRec = target.getBoundingClientRect();
-        let distance = getRectDistance(latestHitTargetRect, targetRec);
-        state.hitData.push({
-            x: targetRec.left,
-            y: targetRec.top,
-            time: hitTime,
-            distance
-        });
-        state.lastTargetTime = now; // Update lastTargetTime for the next target
-        hitCounter.textContent = `Hits: ${score}`;
-        // hitCounter.textContent = `Hits: ${score} gameArea: ${gameArea.getBoundingClientRect().width}x${gameArea.getBoundingClientRect().height}`;
-    });
+    if (isInitial) {
+        // Set the initial target to be red and clickable
+        target.style.backgroundColor = 'red';
+        target.style.opacity = 1.0;
+        state.startTime = performance.now();
+        state.lastTargetTime = state.startTime; // Initialize lastTargetTime
+
+        target.addEventListener('click', () => handleHit(target));
+    } else {
+        // Grey target
+        target.style.backgroundColor = 'grey';
+        target.style.opacity = NEXT_TARGET_OPACITY;
+    }
 
     gameArea.appendChild(target);
-    previousTarget = currentTarget;
-    currentTarget = target;
+
+    if (isInitial) {
+        previousTarget = null;
+        currentTarget = target;
+    }
+
+    return target;
 }
+
+function handleHit(target) {
+    const now = performance.now();
+    latestHitTargetRect = target.getBoundingClientRect();
+    const hitTime = now - state.lastTargetTime; // Correct order of subtraction
+
+    // Play hit sound and update score
+    playSound('hit');
+    score++;
+    hitCounter.textContent = `Hits: ${score}`;
+
+    // Calculate the distance to the previous target
+    let targetRec = target.getBoundingClientRect();
+    // let distance = getRectDistance(latestHitTargetRect, targetRec);
+    // let distance = getRectDistance(previousTarget.getBoundingClientRect(), currentTarget.getBoundingClientRect());
+    console.log(upcomingDistance);
+    // Record the hit data
+    state.hitData.push({
+        x: targetRec.left,
+        y: targetRec.top,
+        time: hitTime,
+        distance: parseFloat(upcomingDistance),
+    });
+
+    state.lastTargetTime = now; // Update lastTargetTime for the next target
+
+    // Remove the clicked target
+    gameArea.removeChild(target);
+
+    // Turn the grey target red and make it clickable
+    const greyTarget = currentTarget;
+    greyTarget.style.backgroundColor = 'red';
+    greyTarget.style.opacity = 1.0;
+    greyTarget.removeEventListener('click', () => { }); // Remove previous listener if any
+    greyTarget.addEventListener('click', () => handleHit(greyTarget));
+
+    // Create a new grey target
+    const newGreyTarget = createTarget();
+
+    // Update the targets
+    previousTarget = greyTarget;
+    currentTarget = newGreyTarget;
+
+    // Draw the connecting line and label
+    drawLineAndLabel(previousTarget, currentTarget);
+}
+
+function drawLineAndLabel(redTarget, greyTarget) {
+    const line = document.getElementById('line') || document.createElement('div');
+    line.id = 'line';
+    line.style.position = 'absolute';
+    line.style.borderTop = '2px dotted yellow';
+    line.style.transformOrigin = '0 0';
+
+    const redRect = redTarget.getBoundingClientRect();
+    const greyRect = greyTarget.getBoundingClientRect();
+
+    const x1 = redRect.left + redRect.width / 2;
+    const y1 = redRect.top + redRect.height / 2;
+    const x2 = greyRect.left + greyRect.width / 2;
+    const y2 = greyRect.top + greyRect.height / 2;
+
+    const distance = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2).toFixed(2);
+    upcomingDistance = distance;
+    const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
+    const length = distance;
+
+    line.style.width = `${length}px`;
+    line.style.left = `${x1}px`;
+    line.style.top = `${y1}px`;
+    line.style.transform = `rotate(${angle}deg)`;
+    line.style.opacity = NEXT_TARGET_OPACITY;
+
+    const label = document.getElementById('distance-label') || document.createElement('div');
+    label.id = 'distance-label';
+    label.style.position = 'absolute';
+    label.style.left = `${(x1 + x2) / 2}px`;
+    label.style.top = `${(y1 + y2) / 2}px`;
+    label.style.backgroundColor = 'grey';
+    // set opacity to 0.5
+    label.style.opacity = NEXT_TARGET_OPACITY;
+    label.style.padding = '2px 5px';
+    label.style.borderRadius = '3px';
+    label.textContent = `${distance} px`;
+
+    if (!document.getElementById('line')) {
+        gameArea.appendChild(line);
+    }
+    if (!document.getElementById('distance-label')) {
+        gameArea.appendChild(label);
+    }
+}
+
+// Add a function call to `startGame` wherever necessary in your code.
 
 function playSound(type) {
     const audio = new Audio(type === 'hit' ? 'audio/hit.wav' : 'audio/miss.wav');
@@ -142,8 +271,8 @@ function startGame() {
         requestFullscreen();
     }
     seed = parseInt(seedInput.value, 10);
-    minDistance = parseInt(minDistanceInput.value, 10);
-    maxDistance = parseInt(maxDistanceInput.value, 10);
+    // minDistance = parseInt(minDistanceInput.value, 10);
+    // maxDistance = parseInt(maxDistanceInput.value, 10);
     score = 0;
     state.missedClicks = 0;
     state.timeLeft = gameLength;
@@ -162,6 +291,14 @@ function startGame() {
     timeCounter.textContent = `Time: ${state.timeLeft}`;
     hitCounter.textContent = `Hits: 0`;
 
+    // Create the initial red and grey targets
+    const initialRedTarget = createTarget(true);
+    currentTarget = createTarget();
+
+    // Draw the connecting line and label
+    drawLineAndLabel(initialRedTarget, currentTarget);
+
+    previousTarget = initialRedTarget;
     timeInterval = setInterval(() => {
         const currentTime = performance.now();
         state.timeLeft = Math.max(0, (state.endTime - currentTime) / 1000);
@@ -172,7 +309,6 @@ function startGame() {
         }
     }, 16); // Update roughly 60 times per second
 
-    createTarget();
 }
 const statsModal = document.getElementById('stats-modal');
 const statsContent = document.getElementById('stats-content');
