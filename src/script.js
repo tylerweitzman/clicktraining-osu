@@ -181,7 +181,7 @@ function handleHit(target) {
     let targetRec = target.getBoundingClientRect();
     // let distance = getRectDistance(latestHitTargetRect, targetRec);
     // let distance = getRectDistance(previousTarget.getBoundingClientRect(), currentTarget.getBoundingClientRect());
-    console.log(upcomingDistance);
+    // console.log(upcomingDistance);
     // Record the hit data
     state.hitData.push({
         x: targetRec.left,
@@ -514,6 +514,34 @@ document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
     pauseGame();
 }
+});
+
+let cursorX = 0;
+let cursorY = 0;
+
+// Track cursor position
+document.addEventListener('mousemove', (event) => {
+    cursorX = event.clientX;
+    cursorY = event.clientY;
+});
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'z' || event.key === 'x') {
+        // Create a new click event
+        const clickEvent = new MouseEvent('click', {
+            view: window,
+            bubbles: true,
+            cancelable: true,
+            clientX: cursorX,
+            clientY: cursorY
+        });
+
+        // Dispatch the event to the element under the cursor
+        const elementAtCursor = document.elementFromPoint(cursorX, cursorY);
+        if (elementAtCursor) {
+            elementAtCursor.dispatchEvent(clickEvent);
+        }
+    }
 });
 
 // Initial state is the end screen

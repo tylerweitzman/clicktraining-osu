@@ -65,7 +65,7 @@ body {
 #game-area {
     position: relative;
     background-color: #121212;
-    background-image: url('background.png');
+    /* background-image: url('background.png'); */
     background-size: cover;
     width: 100%;
     height: 100%;
